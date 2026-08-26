@@ -1,0 +1,6 @@
+{
+  "name": "AeroPulse - Air Quality & Pollution Analytics",
+  "description": "Modern environmental intelligence platform for real-time air quality monitoring, pollutant trends, predictive forecasting, and ML model benchmarking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
