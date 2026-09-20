@@ -464,3 +464,5 @@ export const PLATFORM_STATS = [
   { label: 'Data Points Ingested', value: '2.4M', unit: 'telemetry/day', change: '1.2s latency', icon: 'Database' },
   { label: 'Forecast Horizon', value: '72 Hrs', unit: 'continuous cycle', change: 'Hourly resolution', icon: 'Sparkles' },
 ];
+
+export * from './locationData';

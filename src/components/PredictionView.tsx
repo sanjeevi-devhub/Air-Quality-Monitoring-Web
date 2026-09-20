@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -26,12 +26,42 @@ import {
   RotateCcw,
   Clock,
   CheckCircle2,
+  MapPin,
 } from 'lucide-react';
-import { FORECAST_SERIES_24H, FORECAST_CARDS, ML_MODELS } from '../data/mockData';
+import { ML_MODELS } from '../data/mockData';
+import {
+  GLOBAL_LOCATION_DATASETS,
+  getStatesForCountry,
+  getCitiesForState,
+  getLocationRecord,
+  runLocationPredictionModel,
+} from '../data/locationData';
 import { ForecastPoint } from '../types';
 import { getAQIColorConfig } from '../utils/aqiCalculator';
+import { GlobalLocationSelector } from './GlobalLocationSelector';
 
-export const PredictionView: React.FC = () => {
+interface PredictionViewProps {
+  selectedCountry?: string;
+  selectedState?: string;
+  selectedCity?: string;
+  onLocationChange?: (country: string, state: string, city: string) => void;
+}
+
+export const PredictionView: React.FC<PredictionViewProps> = ({
+  selectedCountry: propCountry,
+  selectedState: propState,
+  selectedCity: propCity,
+  onLocationChange,
+}) => {
+  // Hierarchical Location State (Country -> State/Province -> City/Area)
+  const [internalCountry, setInternalCountry] = useState<string>('India');
+  const [internalState, setInternalState] = useState<string>('Tamil Nadu');
+  const [internalCity, setInternalCity] = useState<string>('Chennai');
+
+  const selectedCountry = propCountry || internalCountry;
+  const selectedState = propState || internalState;
+  const selectedCity = propCity || internalCity;
+
   const [selectedHorizon, setSelectedHorizon] = useState<'12h' | '24h' | '48h'>('24h');
   const [selectedTarget, setSelectedTarget] = useState<'aqi' | 'pm25' | 'pm10' | 'o3'>('aqi');
   const [selectedModel, setSelectedModel] = useState<string>('lstm-rnn');
@@ -42,39 +72,76 @@ export const PredictionView: React.FC = () => {
   const [rainWashout, setRainWashout] = useState<boolean>(false);
   const [trafficRestriction, setTrafficRestriction] = useState<boolean>(false);
 
-  // Dynamic forecast series calculation based on scenario adjustments
-  const dynamicForecastData = FORECAST_SERIES_24H.map((pt) => {
-    if (!pt.isForecast) return pt;
+  // Dynamic Location Handlers
+  const handleCountryChange = (country: string) => {
+    const states = getStatesForCountry(country);
+    const defaultState = states[0] || '';
+    const cities = getCitiesForState(country, defaultState);
+    const defaultCity = cities[0] || '';
 
-    // Apply simulation physics
-    let val = pt.predictedValue;
-    // Stronger wind disperses pollutants
-    val -= windModifier * 1.8;
-    // Higher temp increases ozone/chemical kinetics
-    if (selectedTarget === 'o3' || selectedTarget === 'aqi') {
-      val += tempModifier * 2.2;
+    if (onLocationChange) {
+      onLocationChange(country, defaultState, defaultCity);
+    } else {
+      setInternalCountry(country);
+      setInternalState(defaultState);
+      setInternalCity(defaultCity);
     }
-    // Rain washout washes particulates by 35%
-    if (rainWashout) {
-      val *= 0.65;
+  };
+
+  const handleStateChange = (state: string) => {
+    const cities = getCitiesForState(selectedCountry, state);
+    const defaultCity = cities[0] || '';
+
+    if (onLocationChange) {
+      onLocationChange(selectedCountry, state, defaultCity);
+    } else {
+      setInternalState(state);
+      setInternalCity(defaultCity);
     }
-    // Traffic restriction reduces emissions by 20%
-    if (trafficRestriction) {
-      val *= 0.80;
+  };
+
+  const handleCityChange = (city: string) => {
+    if (onLocationChange) {
+      onLocationChange(selectedCountry, selectedState, city);
+    } else {
+      setInternalCity(city);
     }
+  };
 
-    val = Math.max(18, Math.min(280, Math.round(val)));
-    const low = Math.max(10, Math.round(val * 0.88));
-    const high = Math.round(val * 1.14);
+  // Matched Location Record from Global Dataset
+  const currentLocationRecord = useMemo(() => {
+    return (
+      getLocationRecord(selectedCountry, selectedState, selectedCity) ||
+      GLOBAL_LOCATION_DATASETS[0]
+    );
+  }, [selectedCountry, selectedState, selectedCity]);
 
-    return {
-      ...pt,
-      predictedValue: val,
-      confidenceLower: low,
-      confidenceUpper: high,
-    };
-  });
+  // Run the ML Prediction Model using Filtered Location Data
+  const predictionResult = useMemo(() => {
+    return runLocationPredictionModel(
+      currentLocationRecord,
+      selectedModel,
+      selectedHorizon,
+      selectedTarget,
+      {
+        wind: windModifier,
+        temp: tempModifier,
+        rainWashout,
+        trafficRestriction,
+      }
+    );
+  }, [
+    currentLocationRecord,
+    selectedModel,
+    selectedHorizon,
+    selectedTarget,
+    windModifier,
+    tempModifier,
+    rainWashout,
+    trafficRestriction,
+  ]);
 
+  const dynamicForecastData = predictionResult.timeSeries;
   const currentModelObj = ML_MODELS.find((m) => m.id === selectedModel) || ML_MODELS[0];
   const peakForecast = Math.max(...dynamicForecastData.map((d) => d.predictedValue));
   const peakConfig = getAQIColorConfig(peakForecast);
@@ -100,7 +167,7 @@ export const PredictionView: React.FC = () => {
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Simulate multi-step future pollution trajectories with temporal confidence intervals and meteorological what-if scenario testing.
+            Global location-filtered telemetry feeding R and ML predictive pipelines with temporal confidence intervals and meteorological what-if simulation.
           </p>
         </div>
 
@@ -114,20 +181,33 @@ export const PredictionView: React.FC = () => {
         </div>
       </div>
 
+      {/* Global Location Selection and Location-Based Prediction Module */}
+      <GlobalLocationSelector
+        selectedCountry={selectedCountry}
+        selectedState={selectedState}
+        selectedCity={selectedCity}
+        onCountryChange={handleCountryChange}
+        onStateChange={handleStateChange}
+        onCityChange={handleCityChange}
+        locationRecord={currentLocationRecord}
+        predictionResult={predictionResult}
+      />
+
       {/* Peak Alert Banner if forecast is elevated */}
       {peakForecast > 100 && (
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-900">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold text-sm block">
-              Projected Surge Alert: Peak {peakForecast} AQI Expected in Horizon
+              Projected Surge Alert: Peak {peakForecast} AQI Expected in {currentLocationRecord.cityArea} Horizon
             </span>
             <p className="text-amber-800/90 mt-0.5">
-              The deep learning model forecasts an ambient concentration spike reaching the <strong>{peakConfig.category}</strong> threshold due to anticipated wind lulls and peak diurnal emission cycles.
+              The {currentModelObj.name} algorithm predicts atmospheric concentrations reaching the <strong>{peakConfig.category}</strong> threshold in {currentLocationRecord.cityArea}, {currentLocationRecord.country} under active meteorological dynamics.
             </p>
           </div>
         </div>
       )}
+
 
       {/* Main Prediction & Scenario Playground Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -303,11 +383,14 @@ export const PredictionView: React.FC = () => {
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold font-display text-slate-900">
-                  Historical Telemetry vs AI Forecast (95% CI Band)
+                <h3 className="text-base font-bold font-display text-slate-900 flex items-center gap-2">
+                  <span>Historical Telemetry vs AI Forecast (95% CI Band)</span>
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {currentLocationRecord.cityArea}, {currentLocationRecord.country}
+                  </span>
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Solid green line = Recorded past telemetry | Dashed line = {currentModelObj.name} projection.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Solid green line = Recorded past telemetry | Dashed line = {currentModelObj.name} projection for {currentLocationRecord.cityArea}.
                 </p>
               </div>
               <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
@@ -394,7 +477,7 @@ export const PredictionView: React.FC = () => {
 
           {/* Forecast Horizon Outlook Step Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {FORECAST_CARDS.map((card, idx) => {
+            {predictionResult.forecastCards.map((card, idx) => {
               const cfg = getAQIColorConfig(card.predictedAqi);
               return (
                 <div

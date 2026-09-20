@@ -121,3 +121,25 @@ export interface InsightAlert {
   actionSuggested: string;
   timestamp: string;
 }
+
+export interface LocationAirQualityRecord {
+  country: string;
+  stateProvince: string;
+  cityArea: string;
+  pm25: number;
+  pm10: number;
+  no2: number;
+  so2: number;
+  co: number;
+  o3: number;
+  aqi: number;
+  historicalAqi: number;
+  predictedAqi: number;
+  pollutionLevel: AQICategory;
+  pollutionTrend: 'Rising' | 'Falling' | 'Stable';
+  dominantPollutant: string;
+  stationType?: 'Urban' | 'Industrial' | 'Traffic' | 'Suburban' | 'Coastal';
+  temperature?: number;
+  humidity?: number;
+  windSpeed?: number;
+}

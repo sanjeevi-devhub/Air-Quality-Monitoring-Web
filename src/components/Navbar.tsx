@@ -14,6 +14,10 @@ import {
   X,
   Radio,
   CheckCircle2,
+  AlertTriangle,
+  Bell,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { NavTab, StationInfo } from '../types';
 
@@ -26,6 +30,16 @@ interface NavbarProps {
   isLiveUpdating: boolean;
   onToggleLive: () => void;
   onOpenCalculator: () => void;
+  selectedLocation?: {
+    country: string;
+    stateProvince: string;
+    cityArea: string;
+  };
+  onOpenLocationSelector?: () => void;
+  alertsCount?: number;
+  onTriggerAlert?: () => void;
+  soundEnabled?: boolean;
+  onToggleSound?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -37,6 +51,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   isLiveUpdating,
   onToggleLive,
   onOpenCalculator,
+  selectedLocation,
+  onOpenLocationSelector,
+  alertsCount = 0,
+  onTriggerAlert,
+  soundEnabled = true,
+  onToggleSound,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
@@ -67,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <span className="text-slate-600 hidden sm:inline">•</span>
           <span className="hidden sm:inline text-slate-400 text-[11px]">
-            Station: <strong className="text-emerald-400">{selectedStation.name}</strong>
+            Node: <strong className="text-emerald-400">{selectedLocation ? `${selectedLocation.cityArea}, ${selectedLocation.stateProvince}, ${selectedLocation.country}` : selectedStation.name}</strong>
           </span>
           <span className="text-slate-600 hidden md:inline">•</span>
           <span className="hidden md:inline text-slate-400 text-[11px]">
@@ -76,6 +96,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {selectedStation.aqi > 150 && onTriggerAlert && (
+            <button
+              onClick={onTriggerAlert}
+              id="micro-bar-alert-badge"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/25 text-rose-300 hover:bg-rose-500/35 border border-rose-500/40 text-[11px] font-semibold animate-pulse transition-colors"
+              title="Click to view Environmental AQI > 150 Advisory"
+            >
+              <AlertTriangle className="w-3 h-3 text-rose-400" />
+              <span>AQI {selectedStation.aqi} &gt; 150 ALERT</span>
+            </button>
+          )}
+
           <button
             onClick={onToggleLive}
             id="toggle-live-stream-btn"
@@ -145,15 +177,33 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Controls */}
           <div className="hidden sm:flex items-center gap-2.5">
+            {/* Global Geospatial Location Trigger */}
+            {onOpenLocationSelector && (
+              <button
+                onClick={onOpenLocationSelector}
+                id="navbar-location-selector-btn"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-emerald-300/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold transition-all shadow-2xs group"
+                title="Change Geospatial Location (Country > State > City)"
+              >
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                <span className="truncate max-w-[135px]">
+                  {selectedLocation ? `${selectedLocation.cityArea}, ${selectedLocation.country}` : selectedStation.name}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 font-mono">
+                  AQI {selectedStation.aqi}
+                </span>
+              </button>
+            )}
+
             {/* Station Selector Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setStationDropdownOpen(!stationDropdownOpen)}
                 id="station-selector-trigger"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs"
               >
-                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="truncate max-w-[130px]">{selectedStation.name}</span>
+                <Radio className="w-3.5 h-3.5 text-slate-500" />
+                <span className="truncate max-w-[110px]">Stations</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               </button>
 
@@ -208,6 +258,52 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
+            {/* Environmental Alert Center & Test Trigger */}
+            {onTriggerAlert && (
+              <button
+                onClick={onTriggerAlert}
+                id="navbar-alert-trigger-btn"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-2xs ${
+                  selectedStation.aqi > 150
+                    ? 'border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 animate-pulse'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+                title={
+                  selectedStation.aqi > 150
+                    ? `Current AQI ${selectedStation.aqi} > 150! Click to view environmental advisory`
+                    : 'Test environmental AQI > 150 alert toast'
+                }
+              >
+                <Bell className={`w-3.5 h-3.5 ${selectedStation.aqi > 150 ? 'text-rose-600' : 'text-slate-500'}`} />
+                <span className="hidden md:inline">
+                  {selectedStation.aqi > 150 ? 'AQI > 150 Alert' : 'Alert Test'}
+                </span>
+                {alertsCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold font-mono">
+                    {alertsCount}
+                  </span>
+                ) : selectedStation.aqi > 150 ? (
+                  <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping"></span>
+                ) : null}
+              </button>
+            )}
+
+            {/* Sound Chime Toggle */}
+            {onToggleSound && (
+              <button
+                onClick={onToggleSound}
+                id="navbar-sound-toggle-btn"
+                className="p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs transition-colors shadow-2xs"
+                title={soundEnabled ? 'Alert Chime Sound: ON' : 'Alert Chime Sound: MUTED'}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+            )}
+
             {/* AQI Calculator Button */}
             <button
               onClick={onOpenCalculator}
@@ -221,6 +317,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile Menu Button */}
           <div className="flex lg:hidden items-center gap-2">
+            {onTriggerAlert && (
+              <button
+                onClick={onTriggerAlert}
+                className={`p-2 rounded-lg text-xs flex items-center gap-1 ${
+                  selectedStation.aqi > 150
+                    ? 'bg-rose-100 text-rose-800 animate-pulse'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+                title="Environmental AQI Alert"
+              >
+                <Bell className="w-4 h-4" />
+                {selectedStation.aqi > 150 && (
+                  <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                )}
+              </button>
+            )}
             <button
               onClick={onOpenCalculator}
               className="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs"

@@ -33,6 +33,9 @@ import {
 } from 'lucide-react';
 import { StationInfo, PollutantData, WeatherData, HistoricalPoint } from '../types';
 import { getAQIColorConfig, getAQICategory } from '../utils/aqiCalculator';
+import { LocationSelector } from './LocationSelector';
+import { HealthRecommendationsCard } from './HealthRecommendationsCard';
+import { MiniStationMap } from './MiniStationMap';
 
 interface DashboardViewProps {
   station: StationInfo;
@@ -41,6 +44,10 @@ interface DashboardViewProps {
   hourlyData: HistoricalPoint[];
   onOpenCalculator: () => void;
   onNavigateToAnalytics: () => void;
+  selectedCountry?: string;
+  selectedState?: string;
+  selectedCity?: string;
+  onLocationChange?: (country: string, state: string, city: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -50,6 +57,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   hourlyData,
   onOpenCalculator,
   onNavigateToAnalytics,
+  selectedCountry,
+  selectedState,
+  selectedCity,
+  onLocationChange,
 }) => {
   const [selectedChartPollutant, setSelectedChartPollutant] = useState<'aqi' | 'pm25' | 'pm10' | 'no2' | 'o3'>('aqi');
   const [activePollutantModal, setActivePollutantModal] = useState<PollutantData | null>(null);
@@ -77,7 +88,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
+      {/* Hierarchical Location Selector Bar */}
+      {selectedCountry && selectedState && selectedCity && onLocationChange && (
+        <LocationSelector
+          selectedCountry={selectedCountry}
+          selectedState={selectedState}
+          selectedCity={selectedCity}
+          onLocationChange={onLocationChange}
+          variant="card"
+          showPresets={true}
+          showTelemetryPreview={false}
+        />
+      )}
+
       {/* Top Station Overview Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
         <div className="flex items-center gap-3.5">
@@ -95,13 +119,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {station.status}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {station.location} • Coordinates: {station.coordinates[0].toFixed(4)}°N, {Math.abs(station.coordinates[1]).toFixed(4)}°W • Last synced {station.lastUpdated}
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>{station.location}</span>
+              <span>•</span>
+              <button
+                onClick={() => {
+                  const mapElement = document.getElementById('mini-station-map-card');
+                  if (mapElement) {
+                    mapElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }}
+                className="text-emerald-700 hover:text-emerald-800 font-mono font-semibold underline flex items-center gap-0.5 cursor-pointer"
+                title="Locate station on interactive map"
+              >
+                <span>Coordinates: {station.coordinates[0] >= 0 ? `${station.coordinates[0].toFixed(4)}°N` : `${Math.abs(station.coordinates[0]).toFixed(4)}°S`}, {station.coordinates[1] >= 0 ? `${station.coordinates[1].toFixed(4)}°E` : `${Math.abs(station.coordinates[1]).toFixed(4)}°W`}</span>
+              </button>
+              <span>•</span>
+              <span>Last synced {station.lastUpdated}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            onClick={() => {
+              const mapElement = document.getElementById('mini-station-map-card');
+              if (mapElement) {
+                mapElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors flex items-center gap-1.5"
+            title="Jump to Station Map"
+          >
+            <Compass className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Station Pin</span>
+          </button>
           <button
             onClick={onOpenCalculator}
             className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1.5"
@@ -189,16 +241,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Health Recommendation
+              <div
+                onClick={() => {
+                  document.getElementById('health-recommendations-card')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-100 transition-colors cursor-pointer group"
+                title="Click to view full Health Recommendations & Safety Advisories below"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Health Recommendation
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-medium group-hover:underline flex items-center gap-0.5">
+                    View tips ↓
+                  </span>
                 </div>
                 <div className="text-xs text-slate-600 mt-0.5 line-clamp-2">
                   {station.aqi <= 50
                     ? 'Air quality is great. Ideal for outdoor recreation.'
                     : station.aqi <= 100
                     ? 'Air quality is acceptable; unusually sensitive people reduce heavy outdoor exertion.'
-                    : 'Sensitive groups should avoid prolonged outdoor exposure.'}
+                    : station.aqi <= 150
+                    ? 'Sensitive groups reduce outdoor activity; wear masks if sensitive.'
+                    : station.aqi <= 200
+                    ? 'Wear an N95 mask outdoors; avoid outdoor workouts.'
+                    : 'Health warning: stay indoors with air purifiers active.'}
                 </div>
               </div>
             </div>
@@ -299,6 +366,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Mini Interactive Map: Station Geospatial Pinning & Sensory Dispersion */}
+      <MiniStationMap station={station} />
+
+      {/* Health Recommendations Card: Dynamic Safety Tips based on Selected Station AQI */}
+      <HealthRecommendationsCard
+        aqi={station.aqi}
+        stationName={station.name}
+        dominantPollutant={station.dominantPollutant}
+        onOpenCalculator={onOpenCalculator}
+      />
 
       {/* 6 Core Pollutant Parameter KPI Cards */}
       <div className="space-y-4">

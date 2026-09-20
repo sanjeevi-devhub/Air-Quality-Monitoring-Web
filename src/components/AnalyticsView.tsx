@@ -42,10 +42,24 @@ import {
   SEASONAL_DATA,
   EMISSION_SOURCES,
 } from '../data/mockData';
+import { LocationSelector } from './LocationSelector';
+import { getLocationRecord } from '../data/locationData';
 
 type TimeRangeKey = '24h' | '7d' | '30d' | '12m' | 'seasonal';
 
-export const AnalyticsView: React.FC = () => {
+interface AnalyticsViewProps {
+  selectedCountry?: string;
+  selectedState?: string;
+  selectedCity?: string;
+  onLocationChange?: (country: string, state: string, city: string) => void;
+}
+
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
+  selectedCountry,
+  selectedState,
+  selectedCity,
+  onLocationChange,
+}) => {
   const [timeRange, setTimeRange] = useState<TimeRangeKey>('7d');
   const [selectedPollutants, setSelectedPollutants] = useState<string[]>(['pm25', 'pm10', 'no2']);
   const [exportNotice, setExportNotice] = useState<{
@@ -232,7 +246,19 @@ export const AnalyticsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
+      {/* Global Location Hierarchical Scope Selector */}
+      {selectedCountry && selectedState && selectedCity && onLocationChange && (
+        <LocationSelector
+          selectedCountry={selectedCountry}
+          selectedState={selectedState}
+          selectedCity={selectedCity}
+          onLocationChange={onLocationChange}
+          variant="bar"
+          showPresets={false}
+        />
+      )}
+
       {/* Header & Filter Controls Strip */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
